@@ -1,7 +1,4 @@
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,14 +33,14 @@ public class VRouter {
         packetBytes[10] = new Integer(0).byteValue();
         packetBytes[11] = new Integer(0).byteValue();
 
-        String[] source = packet.getSrcAddress().toString().split("\\.");
-        packetBytes[12] = new Integer(source[0].replace("/", "")).byteValue();
+        String[] source = packet.getSrcAddress().getHostAddress().split("\\.");
+        packetBytes[12] = new Integer(source[0]).byteValue();
         packetBytes[13] = new Integer(source[1]).byteValue();
         packetBytes[14] = new Integer(source[2]).byteValue();
         packetBytes[15] = new Integer(source[3]).byteValue();
 
-        String[] dest = packet.getDestAddress().toString().split("\\.");
-        packetBytes[16] = new Integer(dest[0].replace("/", "")).byteValue();
+        String[] dest = packet.getDestAddress().getHostAddress().split("\\.");
+        packetBytes[16] = new Integer(dest[0]).byteValue();
         packetBytes[17] = new Integer(dest[1]).byteValue();
         packetBytes[18] = new Integer(dest[2]).byteValue();
         packetBytes[19] = new Integer(dest[3]).byteValue();
