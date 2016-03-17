@@ -14,11 +14,62 @@ public class VRouter {
 
     static boolean dropPacket(InetAddress sourceAddress, InetAddress destAddress, int ID, String message) {
         FileOutputStream oStream = null;
+        String outputPath = "messages.txt";
+
         try {
-            oStream = new FileOutputStream("messages.txt");
+            File f = new File(outputPath);
+            boolean shouldAppend = f.exists() && !f.isDirectory();
+
+            oStream = new FileOutputStream("messages.txt", shouldAppend);
             DataOutputStream dataOut = new DataOutputStream(oStream);
+
             String outputMessage = "Packet " + ID + " from " + sourceAddress.getHostAddress() + " to " + destAddress.getHostAddress() +": " + message;
+            if (shouldAppend) dataOut.writeChars("\n");
             dataOut.writeChars(outputMessage);
+
+            dataOut.close();
+            oStream.close();
+
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static boolean forward(IP4Packet ip4packet, InetAddress networkInterface) {
+        ip4packet.setChecksum(checksum(ip4packet));
+        String delimeterRegex = "; ";
+        String outputPath = "OutPackets.txt";
+        try {
+            File f = new File(outputPath);
+            boolean shouldAppend = f.exists() && !f.isDirectory();
+            FileOutputStream oStream = new FileOutputStream(outputPath, shouldAppend);
+            DataOutputStream dataOut = new DataOutputStream(oStream);
+
+            String l1 = Integer.toString(ip4packet.getVersion()) + delimeterRegex +
+                    Integer.toString(ip4packet.getIHL()) + delimeterRegex +
+                    Integer.toString(ip4packet.getToS()) + delimeterRegex +
+                    Integer.toString(ip4packet.getTotalLength()) + "\n";
+            String l2 = Integer.toString(ip4packet.getIdentification()) + delimeterRegex +
+                    ip4packet.getFlags() + delimeterRegex +
+                    Integer.toString(ip4packet.getFragmentOffset()) + "\n";
+            String l3 = Integer.toString(ip4packet.getTTL()) + delimeterRegex +
+                    Integer.toString(ip4packet.getProtocol()) + delimeterRegex +
+                    ip4packet.getChecksum() + "\n";
+            String l4 = ip4packet.getSrcAddress().getHostAddress() + "\n";
+            String l5 = ip4packet.getDestAddress().getHostAddress() + "\n";
+            String l6 = networkInterface.getHostAddress();
+
+            if (shouldAppend) dataOut.writeChars("\n\n");
+            dataOut.writeChars(l1);
+            dataOut.writeChars(l2);
+            dataOut.writeChars(l3);
+            dataOut.writeChars(l4);
+            dataOut.writeChars(l5);
+            dataOut.writeChars(l6);
+
+            dataOut.close();
+            oStream.close();
 
             return true;
         } catch (IOException e) {
