@@ -12,6 +12,20 @@ public class VRouter {
         return IP4Packet.parseFile(fileName);
     }
 
+    static boolean dropPacket(InetAddress sourceAddress, InetAddress destAddress, int ID, String message) {
+        FileOutputStream oStream = null;
+        try {
+            oStream = new FileOutputStream("messages.txt");
+            DataOutputStream dataOut = new DataOutputStream(oStream);
+            String outputMessage = "Packet " + ID + " from " + sourceAddress.getHostAddress() + " to " + destAddress.getHostAddress() +": " + message;
+            dataOut.writeChars(outputMessage);
+
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     public static String checksum(IP4Packet packet) {
         byte[] packetBytes = new byte[20];
 

@@ -9,5 +9,7 @@ public class Main {
         System.out.println(VRouter.checksum(packets.get(0)));
         System.out.println(VRouter.checksum(packets.get(1)));
         System.out.println(VRouter.checksum(packets.get(2)));
+
+        System.out.println(VRouter.dropPacket(packets.get(0).getSrcAddress(), packets.get(0).getDestAddress(), 1, "heres a message"));
     }
 }
