@@ -1,5 +1,7 @@
 import java.io.*;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,6 +10,15 @@ import java.util.List;
  */
 public class VRouter {
 
+	private List<String> ForwardingTable = new ArrayList<String>();
+	public VRouter(String ForwardingTable, String Interfaces) throws IOException{
+	    BufferedReader br = new BufferedReader(new FileReader(ForwardingTable + ".txt"));
+	    String line = br.readLine();
+	    while (line != null){
+	    	this.ForwardingTable.add(line);
+	    }
+	    br.close();
+	}
     public static List<IP4Packet> incomingPackets(String fileName) throws IOException {
         return IP4Packet.parseFile(fileName);
     }
