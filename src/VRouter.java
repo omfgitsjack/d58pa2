@@ -1,24 +1,133 @@
 import java.io.*;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Created by omfgitsjack on 2016-03-16.
  */
 public class VRouter {
 
-	private List<String> ForwardingTable = new ArrayList<String>();
-	public VRouter(String ForwardingTable, String Interfaces) throws IOException{
-	    BufferedReader br = new BufferedReader(new FileReader(ForwardingTable + ".txt"));
+	public static HashMap<String,String> ForwardingTableMap = new HashMap();
+	public static HashMap<String,String> InterfacesMap = new HashMap();
+
+	//Converts string ip to binary, example 255.255.255.0 = ["111111","111111","111111","0"]
+	public static String[] binaryConvert(String ip){
+		String[] prefix = ip.split("\\.");
+		String[] binaryPrefix = new String[10];
+		for (int i = 0; i < prefix.length; i++){
+    		binaryPrefix[i] = Integer.toBinaryString(Integer.parseInt(prefix[i])); 
+		}
+		return binaryPrefix;
+	}
+	
+	//Converts binary ip to string, example ["111111","111111","111111","0"] = 255.255.255.0
+	public static String decimalConvert(String[] binaryIp) throws NullPointerException{
+		String ip = "";
+		for (String s: binaryIp){
+			try{
+				if (s.equals(null)){
+					return ip;
+				}
+			}
+			catch (Exception e){
+				ip = ip.substring(0,ip.length()-1);
+				return ip;
+			};
+    		ip += Integer.parseInt(s,2) +"."; 
+		}
+		ip = ip.substring(0,ip.length()-1);
+		return ip;
+	}
+	
+	public static void Setup() throws IOException{
+		BufferedReader br = new BufferedReader(new FileReader("Interfaces.txt"));
 	    String line = br.readLine();
+	    String[] split = new String[3];
 	    while (line != null){
-	    	this.ForwardingTable.add(line);
+	    	line = line.substring(1, line.length()-1);
+	    	split = line.split(";");
+	    	String[] prefix = binaryConvert(split[1]);
+	    	int prefixNum = 0;
+	    	for (int i = 0; i < 3; i++){
+	    		prefixNum += prefix[i].length(); 
+	    	}
+
+	    	InterfacesMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]);
+	    	line = br.readLine();
+	    }
+	    br.close();
+	    
+	    br = new BufferedReader(new FileReader("ForwardingTable.txt"));
+	    line = br.readLine();
+	    while (line != null){
+	    	line = line.substring(1, line.length()-1);
+	    	split = line.split(";");
+	    	String[] prefix = binaryConvert(split[1]);
+	    	int prefixNum = 0;
+	    	for (int i = 0; i < 4; i++){
+	    		prefixNum += prefix[i].length(); 
+	    	}
+	    	ForwardingTableMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]);
+	    	line = br.readLine();
 	    }
 	    br.close();
 	}
+	
+	//Checks rather ipAddress is inside the interfaceMap or not
+	//Since keys in InterfaceMap has mask we would get rid of the number after "\"
+	//Example 172.11.0.2\23 => 172.11.0.2 
+	@SuppressWarnings("unchecked")
+	public static boolean lookupInterfaces(InetAddress ipAddress){
+		String ip = ipAddress.toString().substring(1);
+		Set<String> keys = InterfacesMap.keySet();
+		for (String s: keys){
+			if (s.substring(0, s.lastIndexOf("/")).equals(ip)){
+				return true;
+			}
+		}
+		return false;
+	};
+	
+	@SuppressWarnings("unchecked")
+	public static InetAddress lookupDest(InetAddress ipAddress) throws UnknownHostException{
+		String ip = ipAddress.toString().substring(1);
+		String[] binary = binaryConvert(ip);
+    	Set<String> tempKey = ForwardingTableMap.keySet();
+    	int max = 0;
+    	int gMax = 0;
+    	HashMap mask = new HashMap();
+    	String[] ipReturn = new String[10];
+    	for (String s: tempKey){
+    		String[] sec = binaryConvert(s.substring(0,s.lastIndexOf("/")));
+    		mask.put(sec, s.substring(s.lastIndexOf("/")));
+    		int l = 0;
+    		while (sec[l] != null){
+    			if (sec[l].equals(binary[l])){
+    				max += 1;
+    			}
+    			l += 1;
+    		}
+    		if (max > gMax){
+    			gMax = max;
+    			ipReturn = sec;
+    		}
+    	}
+    	String fixed = decimalConvert(ipReturn) + mask.get(ipReturn);
+    	return(InetAddress.getByName(ForwardingTableMap.get(fixed)));
+		
+	};
+	
+	//Main function
+	public VRouter() throws IOException{
+	    Setup();
+	}
+	
     public static List<IP4Packet> incomingPackets(String fileName) throws IOException {
         return IP4Packet.parseFile(fileName);
     }
