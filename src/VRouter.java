@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
@@ -167,6 +168,52 @@ public class VRouter {
         return IP4Packet.parseFile(fileName);
     }
 
+    static List<IP4Packet> fragment(IP4Packet ip4packet, int MTU) {
+        ArrayList<IP4Packet> l = new ArrayList<>();
+        if (ip4packet.getTotalLength() <= MTU) { // No need to fragment
+            ip4packet.setMFFlag(0);
+            ip4packet.setFragmentOffset(0);
+            l.add(ip4packet);
+
+            return l;
+        }
+
+        if (ip4packet.getDFFlag() == 1) { // Don't fragment.
+            dropPacket(ip4packet.getSrcAddress(), ip4packet.getDestAddress(), ip4packet.getIdentification(), "Fragmentation needed and DF set.");
+            return new ArrayList<>();
+        }
+
+        // calculate total fragments needed
+        int payloadSize = ip4packet.getTotalLength() - 20;
+        int effectiveMTU = MTU - 20; // How much of actual payload can we transfer
+        int totalFragmentsNeeded = (int) Math.ceil( payloadSize / (double) effectiveMTU );
+
+        // Build fragments
+        for (int i = 0; i < totalFragmentsNeeded; i++) {
+            IP4Packet packet = ip4packet.clone();
+            packet.setFragmentOffset(i);
+
+            if (i == totalFragmentsNeeded -1) { // Is last fragment
+                int lastFragmentSize = (payloadSize % effectiveMTU);
+                if (lastFragmentSize == 0) { // Last fragment, use all the payload space.
+                    packet.setTotalLength(MTU);
+                } else {
+                    packet.setTotalLength(lastFragmentSize + 20);
+                }
+
+                packet.setMFFlag(0);
+            } else {
+                packet.setTotalLength(MTU);
+                packet.setMFFlag(1);
+            }
+
+            packet.setChecksum(VRouter.checksum(packet));
+            l.add(packet);
+        }
+
+        return l;
+    }
+
     static boolean dropPacket(InetAddress sourceAddress, InetAddress destAddress, int ID, String message) {
         FileOutputStream oStream = null;
         String outputPath = "messages.txt";
@@ -279,7 +326,7 @@ public class VRouter {
     }
 }
 
-class IP4Packet {
+class IP4Packet implements Cloneable {
 
     // Line 1
     private int version;
@@ -393,6 +440,35 @@ class IP4Packet {
         } catch (Exception e) {
             throw e;
         }
+    }
+
+    public int getDFFlag() {
+        return Integer.parseInt(flags.split("")[1]);
+    }
+
+    @Override
+    protected IP4Packet clone() {
+        return new IP4Packet(version, IHL, ToS, totalLength, identification, flags, fragmentOffset, TTL, protocol, checksum, srcAddress, destAddress);
+    }
+
+    public void setDFFlag(int flag) {
+        String firstBit = Integer.toString(0);
+        String secondBit = Integer.toString(flag);
+        String thirdBit = flags.split("")[2];
+
+        this.setFlags(firstBit + secondBit + thirdBit);
+    }
+
+    public int getMFFlag() {
+        return Integer.parseInt(flags.split("")[2]);
+    }
+
+    public void setMFFlag(int flag) {
+        String firstBit = Integer.toString(0);
+        String secondBit = flags.split("")[1];
+        String thirdBit = Integer.toString(flag);
+
+        this.setFlags(firstBit + secondBit + thirdBit);
     }
 
     public int getVersion() {
