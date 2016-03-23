@@ -16,35 +16,30 @@ public class VRouter {
 	public static HashMap<String,String> ForwardingTableMap = new HashMap();
 	public static HashMap<String,String> InterfacesMap = new HashMap();
 
-	//Converts string ip to binary, example 255.255.255.0 = ["111111","111111","111111","0"]
-	public static String[] binaryConvert(String ip){
+	//Converts string decimal ip to binary, example "255.255.255.0" = "11111111.11111111.11111111.00000000"
+	public static String binaryConvert(String ip){
 		String[] prefix = ip.split("\\.");
-		String[] binaryPrefix = new String[10];
+		String binaryPrefix = "";
 		for (int i = 0; i < prefix.length; i++){
-    		binaryPrefix[i] = Integer.toBinaryString(Integer.parseInt(prefix[i])); 
+			String binary = Integer.toBinaryString(Integer.parseInt(prefix[i]));
+			while (binary.length() < 8){
+				binary = "0" + binary;
+			}
+    		binaryPrefix +=  binary + "."; 
 		}
-		return binaryPrefix;
+		return binaryPrefix.substring(0, binaryPrefix.length()-1);
 	}
 	
-	//Converts binary ip to string, example ["111111","111111","111111","0"] = 255.255.255.0
+	//Converts string[] binary ip to string, example ["11111111","11111111","11111111","00000000"] = "255.255.255.0"
 	public static String decimalConvert(String[] binaryIp) throws NullPointerException{
 		String ip = "";
 		for (String s: binaryIp){
-			try{
-				if (s.equals(null)){
-					return ip;
-				}
-			}
-			catch (Exception e){
-				ip = ip.substring(0,ip.length()-1);
-				return ip;
-			};
     		ip += Integer.parseInt(s,2) +"."; 
 		}
-		ip = ip.substring(0,ip.length()-1);
-		return ip;
+		return ip.substring(0,ip.length()-1);
 	}
 	
+	//Setup both interface and forwardingtable hashmap
 	public static void Setup() throws IOException{
 		BufferedReader br = new BufferedReader(new FileReader("Interfaces.txt"));
 	    String line = br.readLine();
@@ -52,28 +47,48 @@ public class VRouter {
 	    while (line != null){
 	    	line = line.substring(1, line.length()-1);
 	    	split = line.split(";");
-	    	String[] prefix = binaryConvert(split[1]);
+	    	String[] prefix = binaryConvert(split[1]).split("\\.");
 	    	int prefixNum = 0;
-	    	for (int i = 0; i < 3; i++){
+	    	for (int i = 0; i < 4; i++){
+	    		if (i == 3){
+	    			while (prefix[3].endsWith("0")){
+	    				prefix[3] = prefix[3].substring(0, prefix[3].length()-1);
+	    			}
+	    		}
 	    		prefixNum += prefix[i].length(); 
 	    	}
+	    	System.out.println(prefixNum);
 
 	    	InterfacesMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]);
 	    	line = br.readLine();
 	    }
 	    br.close();
 	    
+	    
 	    br = new BufferedReader(new FileReader("ForwardingTable.txt"));
 	    line = br.readLine();
 	    while (line != null){
 	    	line = line.substring(1, line.length()-1);
 	    	split = line.split(";");
-	    	String[] prefix = binaryConvert(split[1]);
+	    	String[] prefix = binaryConvert(split[1]).split("\\.");
+	    	String[] keyPrefix = binaryConvert(split[3]).split("\\.");
 	    	int prefixNum = 0;
+	    	int keyPrefixNum = 0;
 	    	for (int i = 0; i < 4; i++){
+	    		if (i == 3){
+	    			while (prefix[3].endsWith("0")){
+	    				prefix[3] = prefix[3].substring(0, prefix[3].length()-1);
+	    			}
+	    			while (keyPrefix[3].endsWith("0")){
+	    				keyPrefix[3] = keyPrefix[3].substring(0, keyPrefix[3].length()-1);
+	    				
+	    			}
+	    		}
+	    		System.out.println("qqq"+keyPrefix[i]);
 	    		prefixNum += prefix[i].length(); 
+	    		keyPrefixNum += keyPrefix[i].length();
 	    	}
-	    	ForwardingTableMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]);
+	    	ForwardingTableMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]+"/" +keyPrefixNum);
 	    	line = br.readLine();
 	    }
 	    br.close();
@@ -97,29 +112,49 @@ public class VRouter {
 	@SuppressWarnings("unchecked")
 	public static InetAddress lookupDest(InetAddress ipAddress) throws UnknownHostException{
 		String ip = ipAddress.toString().substring(1);
-		String[] binary = binaryConvert(ip);
-    	Set<String> tempKey = ForwardingTableMap.keySet();
-    	int max = 0;
-    	int gMax = 0;
-    	HashMap mask = new HashMap();
-    	String[] ipReturn = new String[10];
-    	for (String s: tempKey){
-    		String[] sec = binaryConvert(s.substring(0,s.lastIndexOf("/")));
-    		mask.put(sec, s.substring(s.lastIndexOf("/")));
-    		int l = 0;
-    		while (sec[l] != null){
-    			if (sec[l].equals(binary[l])){
-    				max += 1;
+		String binary = binaryConvert(ip);
+    	Set<String> allKey = ForwardingTableMap.keySet();
+    	int mask = 0;
+    	int right = 0;
+    	int wrong = 0;
+    	int maxRight = 0;
+    	int maxWrong = 0;
+    	String ipReturn = "";
+    	for (String s: allKey){
+    		String keys = binaryConvert(s.substring(0,s.lastIndexOf("/")));
+    		mask = Integer.parseInt(s.substring(s.lastIndexOf("/")+1));
+    		String keyIp = keys;
+    		keys = keys.substring(0, keys.length()- mask);
+   
+    		for (int l = 1; l <= keys.length(); l++){
+    			
+    			if (keys.substring(0,l).equals(binary.substring(0,l))){
+    				right += 1;
     			}
-    			l += 1;
+    			else{
+    				wrong += 1;
+    			}
     		}
-    		if (max > gMax){
-    			gMax = max;
-    			ipReturn = sec;
+    		if (right > maxRight){
+    			maxRight = right;
+    			maxWrong = wrong;
+    			ipReturn = keyIp;
+    		}
+    		else if (right == maxRight){
+    			if (wrong < maxWrong){
+    				maxRight = right;
+    				maxWrong = wrong;
+    				ipReturn = keyIp;
+    			}
     		}
     	}
-    	String fixed = decimalConvert(ipReturn) + mask.get(ipReturn);
-    	return(InetAddress.getByName(ForwardingTableMap.get(fixed)));
+    	if (maxRight == 0){
+    		return null;
+    	}
+    	ipReturn = decimalConvert(ipReturn.split("\\.")) + "/" + Integer.toString(mask);
+    	ipReturn = ForwardingTableMap.get(ipReturn);
+    	ipReturn = ipReturn.substring(0, ipReturn.lastIndexOf("/"));
+    	return(InetAddress.getByName(ipReturn));
 		
 	};
 	
