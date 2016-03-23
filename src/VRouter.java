@@ -162,6 +162,45 @@ public class VRouter {
 	//Main function
 	public VRouter() throws IOException{
 	    Setup();
+        ArrayList<IP4Packet> packets = (ArrayList<IP4Packet>) incomingPackets("InPackets.txt");
+
+        for (IP4Packet packet : packets) {
+            if (packet.getChecksum().equals(checksum(packet))) {
+                InetAddress destAddress = packet.getDestAddress();
+                InetAddress matchedInterface;
+                if (lookupInterfaces(destAddress) || lookupDest(destAddress) != null) {
+                    if (lookupInterfaces(destAddress)) {
+                        String message = "Packet from " + packet.getSrcAddress().getHostAddress() + " destined for this router " +
+                                "successfully received: " + packet.getIdentification();
+                        FileOutputStream fout;
+                        try {
+                            fout = new FileOutputStream("messages.txt");
+                            fout.write(message.getBytes());
+                            fout.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    } else if ((matchedInterface = lookupDest(destAddress)) != null) {
+                        packet.setTTL(packet.getTTL() - 1);
+                        if (packet.getTTL() < 0)
+                            dropPacket(packet.getSrcAddress(), packet.getDestAddress(), packet.getIdentification(), "TTL exceeded.");
+                        int MTU = Integer.parseInt(InterfacesMap.get(matchedInterface.getHostAddress()));
+                        if (MTU < packet.getTotalLength()) {
+                            List<IP4Packet> fragments = fragment(packet, MTU);
+                            if (fragments.size() > 0) {
+                                for (IP4Packet fragment : fragments) {
+                                    forward(fragment, matchedInterface);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    dropPacket(packet.getSrcAddress(), packet.getDestAddress(), packet.getIdentification(), "Destination not found");
+                }
+            } else {
+                dropPacket(packet.getSrcAddress(), packet.getDestAddress(), packet.getIdentification(), "Checksum error");
+            }
+        }
 	}
 	
     public static List<IP4Packet> incomingPackets(String fileName) throws IOException {
@@ -170,7 +209,7 @@ public class VRouter {
 
     static List<IP4Packet> fragment(IP4Packet ip4packet, int MTU) {
         ArrayList<IP4Packet> l = new ArrayList<>();
-        if (ip4packet.getTotalLength() <= MTU) { // No need to fragment
+        if (MTU >= ip4packet.getTotalLength()) { // No need to fragment
             ip4packet.setMFFlag(0);
             ip4packet.setFragmentOffset(0);
             l.add(ip4packet);
@@ -191,8 +230,8 @@ public class VRouter {
         // Build fragments
         for (int i = 0; i < totalFragmentsNeeded; i++) {
             IP4Packet packet = ip4packet.clone();
-            packet.setFragmentOffset(i);
 
+            packet.setFragmentOffset(i * payloadSize / 8);
             if (i == totalFragmentsNeeded -1) { // Is last fragment
                 int lastFragmentSize = (payloadSize % effectiveMTU);
                 if (lastFragmentSize == 0) { // Last fragment, use all the payload space.
