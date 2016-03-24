@@ -29,7 +29,7 @@ public class Main {
 
 
 
-        System.out.println(V.lookupDest(InetAddress.getByName("172.18.25.1")));
+        System.out.println("qqq"+V.lookupDest(InetAddress.getByName("222.111.0.0")));
 
         ArrayList<IP4Packet> fragmentedPackets = (ArrayList<IP4Packet>) VRouter.fragment(packets.get(2), 29);
         System.out.println(fragmentedPackets.size());

@@ -111,13 +111,13 @@ public class VRouter {
     				wrong += 1;
     			}
     		}
-    		if (right > maxRight){
+    		if (right > maxRight && right > wrong){
     			maxRight = right;
     			maxWrong = wrong;
     			ipReturn = keyIp;
     			maskReturn = mask;
     		}
-    		else if (right == maxRight){
+    		else if (right == maxRight && right > wrong){
     			if (wrong < maxWrong){
     				maxRight = right;
     				maxWrong = wrong;
@@ -133,7 +133,7 @@ public class VRouter {
     	}
     	ipReturn = decimalConvert(ipReturn.split("\\.")) + "/" + Integer.toString(maskReturn);
     	ipReturn = ForwardingTableMap.get(ipReturn);
-    	System.out.println("mask is "+maskReturn);
+    	System.out.println("mask is "+ipReturn);
     	ipReturn = ipReturn.substring(0, ipReturn.lastIndexOf("/"));
     	return(InetAddress.getByName(ipReturn));
 		
