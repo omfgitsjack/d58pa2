@@ -133,7 +133,6 @@ public class VRouter {
     	}
     	ipReturn = decimalConvert(ipReturn.split("\\.")) + "/" + Integer.toString(maskReturn);
     	ipReturn = ForwardingTableMap.get(ipReturn);
-    	System.out.println("mask is "+ipReturn);
     	ipReturn = ipReturn.substring(0, ipReturn.lastIndexOf("/"));
     	return(InetAddress.getByName(ipReturn));
 		
