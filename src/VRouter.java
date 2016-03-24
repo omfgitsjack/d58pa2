@@ -151,7 +151,7 @@ public class VRouter {
                 if (lookupInterfaces(destAddress) || lookupDest(destAddress) != null) {
                     if (lookupInterfaces(destAddress)) {
                         String message = "Packet from " + packet.getSrcAddress().getHostAddress() + " destined for this router " +
-                                "successfully received: " + packet.getIdentification();
+                                "successfully received: " + packet.getIdentification() + "\n";
                         FileOutputStream fout;
                         try {
                             fout = new FileOutputStream("messages.txt");
@@ -170,12 +170,10 @@ public class VRouter {
                         	}
                         }
                         int MTU = Integer.parseInt(InterfacesMap.get(dest));
-                        if (MTU < packet.getTotalLength()) {
-                            List<IP4Packet> fragments = fragment(packet, MTU);
-                            if (fragments.size() > 0) {
-                                for (IP4Packet fragment : fragments) {
-                                    forward(fragment, matchedInterface);
-                                }
+                        List<IP4Packet> fragments = fragment(packet, MTU); // Fragment will return original packet if we can fit it w/o fragmenting
+                        if (fragments.size() > 0) {
+                            for (IP4Packet fragment : fragments) {
+                                forward(fragment, matchedInterface);
                             }
                         }
                     }
