@@ -46,21 +46,11 @@ public class VRouter {
 	    String line = br.readLine();
 	    String[] split = new String[3];
 	    while (line != null){
-	    	line = line.substring(1, line.length()-1);
-	    	split = line.split(";");
-	    	String[] prefix = binaryConvert(split[1]).split("\\.");
-	    	int prefixNum = 0;
-	    	for (int i = 0; i < 4; i++){
-	    		if (i == 3){
-	    			while (prefix[3].endsWith("0")){
-	    				prefix[3] = prefix[3].substring(0, prefix[3].length()-1);
-	    			}
-	    		}
-	    		prefixNum += prefix[i].length(); 
-	    	}
-	    	System.out.println(prefixNum);
-
-	    	InterfacesMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]);
+	    	split = line.split(";");	  
+	    	split[0] = split[0].replaceAll(" ", "");
+	    	split[1] = split[1].replaceAll(" ", "");
+	    	split[2] = split[2].replaceAll(" ", "");
+	    	InterfacesMap.put(split[0]+"/"+split[1], split[2]);
 	    	line = br.readLine();
 	    }
 	    br.close();
@@ -69,27 +59,12 @@ public class VRouter {
 	    br = new BufferedReader(new FileReader("ForwardingTable.txt"));
 	    line = br.readLine();
 	    while (line != null){
-	    	line = line.substring(1, line.length()-1);
 	    	split = line.split(";");
-	    	String[] prefix = binaryConvert(split[1]).split("\\.");
-	    	String[] keyPrefix = binaryConvert(split[3]).split("\\.");
-	    	int prefixNum = 0;
-	    	int keyPrefixNum = 0;
-	    	for (int i = 0; i < 4; i++){
-	    		if (i == 3){
-	    			while (prefix[3].endsWith("0")){
-	    				prefix[3] = prefix[3].substring(0, prefix[3].length()-1);
-	    			}
-	    			while (keyPrefix[3].endsWith("0")){
-	    				keyPrefix[3] = keyPrefix[3].substring(0, keyPrefix[3].length()-1);
-	    				
-	    			}
-	    		}
-	    		System.out.println("qqq"+keyPrefix[i]);
-	    		prefixNum += prefix[i].length(); 
-	    		keyPrefixNum += keyPrefix[i].length();
-	    	}
-	    	ForwardingTableMap.put(split[0]+"/"+Integer.toString(prefixNum), split[2]+"/" +keyPrefixNum);
+	    	split[0] = split[0].replaceAll(" ", "");
+	    	split[1] = split[1].replaceAll(" ", "");
+	    	split[2] = split[2].replaceAll(" ", "");
+	    	split[3] = split[3].replaceAll(" ", "");
+	    	ForwardingTableMap.put(split[0]+"/"+split[1], split[2]+"/" + split[3]);
 	    	line = br.readLine();
 	    }
 	    br.close();
@@ -113,23 +88,23 @@ public class VRouter {
 	@SuppressWarnings("unchecked")
 	public static InetAddress lookupDest(InetAddress ipAddress) throws UnknownHostException{
 		String ip = ipAddress.toString().substring(1);
-		String binary = binaryConvert(ip);
-    	Set<String> allKey = ForwardingTableMap.keySet();
+		String binaryIp = binaryConvert(ip);
+    	Set<String> allKeys = ForwardingTableMap.keySet();
     	int mask = 0;
     	int right = 0;
     	int wrong = 0;
     	int maxRight = 0;
     	int maxWrong = 0;
     	String ipReturn = "";
-    	for (String s: allKey){
+    	int maskReturn = 0;
+    	for (String s: allKeys){
     		String keys = binaryConvert(s.substring(0,s.lastIndexOf("/")));
     		mask = Integer.parseInt(s.substring(s.lastIndexOf("/")+1));
     		String keyIp = keys;
     		keys = keys.substring(0, keys.length()- mask);
    
     		for (int l = 1; l <= keys.length(); l++){
-    			
-    			if (keys.substring(0,l).equals(binary.substring(0,l))){
+    			if (keys.substring(0,l).equals(binaryIp.substring(0,l))){
     				right += 1;
     			}
     			else{
@@ -140,20 +115,25 @@ public class VRouter {
     			maxRight = right;
     			maxWrong = wrong;
     			ipReturn = keyIp;
+    			maskReturn = mask;
     		}
     		else if (right == maxRight){
     			if (wrong < maxWrong){
     				maxRight = right;
     				maxWrong = wrong;
     				ipReturn = keyIp;
+    				maskReturn = mask;
     			}
     		}
+    		right = 0;
+    		wrong = 0;
     	}
     	if (maxRight == 0){
     		return null;
     	}
-    	ipReturn = decimalConvert(ipReturn.split("\\.")) + "/" + Integer.toString(mask);
+    	ipReturn = decimalConvert(ipReturn.split("\\.")) + "/" + Integer.toString(maskReturn);
     	ipReturn = ForwardingTableMap.get(ipReturn);
+    	System.out.println("mask is "+maskReturn);
     	ipReturn = ipReturn.substring(0, ipReturn.lastIndexOf("/"));
     	return(InetAddress.getByName(ipReturn));
 		
@@ -163,7 +143,7 @@ public class VRouter {
 	public VRouter() throws IOException{
 	    Setup();
         ArrayList<IP4Packet> packets = (ArrayList<IP4Packet>) incomingPackets("InPackets.txt");
-
+        String dest = "";
         for (IP4Packet packet : packets) {
             if (packet.getChecksum().equals(checksum(packet))) {
                 InetAddress destAddress = packet.getDestAddress();
@@ -184,7 +164,12 @@ public class VRouter {
                         packet.setTTL(packet.getTTL() - 1);
                         if (packet.getTTL() < 0)
                             dropPacket(packet.getSrcAddress(), packet.getDestAddress(), packet.getIdentification(), "TTL exceeded.");
-                        int MTU = Integer.parseInt(InterfacesMap.get(matchedInterface.getHostAddress()));
+                        for (String s: InterfacesMap.keySet()){
+                        	if (s.substring(0,s.lastIndexOf("/")).equals(matchedInterface.getHostAddress())){
+                        		dest = s;
+                        	}
+                        }
+                        int MTU = Integer.parseInt(InterfacesMap.get(dest));
                         if (MTU < packet.getTotalLength()) {
                             List<IP4Packet> fragments = fragment(packet, MTU);
                             if (fragments.size() > 0) {

@@ -33,5 +33,7 @@ public class Main {
 
         ArrayList<IP4Packet> fragmentedPackets = (ArrayList<IP4Packet>) VRouter.fragment(packets.get(2), 29);
         System.out.println(fragmentedPackets.size());
+        
+        System.out.println(V.lookupDest(InetAddress.getByName("150.111.0.5")));
     }
 }
